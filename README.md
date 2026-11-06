@@ -4,15 +4,13 @@
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-2E7D4F)](LICENSE)
 
-Antimicrobial resistance arises when a microorganism no longer responds to a drug that previously inhibited it. In an intensive care unit the consequences are immediate: patients are already critically ill, and the usual laboratory test, the antibiogram, takes about 48 hours to report whether the isolated bacterium is resistant or susceptible. During that interval the antibiotic treatment has to be chosen without the laboratory result.
+**Antimicrobial resistance** arises when a microorganism no longer responds to a drug that previously inhibited it. In an **intensive care unit (ICU)** the consequences are immediate: patients are already critically ill, and the usual laboratory test, the **antibiogram**, takes about **48 hours** to report whether the isolated bacterium is **resistant** or **susceptible**. During that interval the antibiotic treatment has to be chosen without the laboratory result.
 
-The objective of this work is to predict, for a culture of *Pseudomonas aeruginosa*, whether the bacterium will be resistant or susceptible to a given antibiotic family, using only information that is already available before the antibiogram result. *Pseudomonas aeruginosa* was selected because it is frequent in the ICU, it causes severe infection, and it readily develops resistance to several drugs.
+The objective of this work is to predict, for a culture of ***Pseudomonas aeruginosa***, whether the bacterium will be resistant or susceptible to a given **antibiotic family**, using only information available before the antibiogram result. The study uses **electronic health records (EHR)** already stored by the hospital, together with the results of earlier antibiograms.
 
-To do that, the study uses electronic health records (EHR) that the hospital already stores, together with the results of earlier antibiograms. The approach does not require whole-genome sequencing. The same records can therefore be used in other ICUs that collect cultures, admission data and susceptibility results.
+The cohort comes from the ICU of **Hospital Universitario de Fuenlabrada** (Madrid, Spain): **3,346 patients** and **3,812 admissions**, from July 2004 to May 2019. Of **43,658 cultures**, the study retains the **764** in which *Pseudomonas aeruginosa* was isolated.
 
-The cohort of EHR data comes from the ICU of Hospital Universitario de Fuenlabrada (Madrid, Spain). It covers 3,346 patients and 3,812 admissions, from July 2004 to May 2019. Over that period 43,658 cultures were collected, from which this study retains the 764 cultures in which *Pseudomonas aeruginosa* was isolated. Some patients have more than one admission, which is why the number of admissions is larger than the number of patients.
-
-Resistance is predicted separately for each antibiotic family. Six binary classifiers are trained, one per family, because a culture may be resistant to one family and susceptible to another, and because each classifier can then be examined on its own. The families considered in the study are the following.
+Resistance is predicted separately for each family, with one **binary classifier** per family. The six families considered in the study are the following.
 
 | Code | Antibiotic family |
 | --- | --- |
@@ -35,7 +33,7 @@ This repository contains the code that corresponds to the published experiment.
 
 > Hernández-Carnerero, À., Sànchez-Marrè, M., Mora-Jiménez, I., Soguero-Ruiz, C., Martínez-Agüero, S., & Álvarez-Rodríguez, J. (2021). *Antimicrobial Resistance Prediction in Intensive Care Unit for Pseudomonas aeruginosa using Temporal Data-Driven Models.* International Journal of Interactive Multimedia and Artificial Intelligence. [https://doi.org/10.9781/ijimai.2021.02.012](https://doi.org/10.9781/ijimai.2021.02.012)
 
-## Change of resistance over time
+## Evolution of resistance over time
 
 The proportion of resistant cultures changes over the 15 years of the cohort. In the earlier years, susceptible results are the majority for most families. In the later years, resistant results become more frequent. The series also falls in 2013, when the ICU information system was replaced and fewer antibiograms were recorded. Polymyxins remain an exception: resistant results stay uncommon. Carbapenems move in the opposite direction and are resistant in nearly every culture by the end of the period.
 
@@ -51,7 +49,7 @@ The test set is always one calendar month. The first test month is January 2016,
   <img src="assets/figures/windows.png" alt="Four training schemes for a test month in 2016: a four-year window immediately before the test, the same window two years earlier, the same window four years earlier, and an incremental window from 2004." width="820">
 </p>
 
-In panel (a) the four-year training window ends just before the test month. In panels (b) and (c) the same four-year window is moved back by two and four years. In panel (d) training contains every culture from the start of the cohort up to the test month, and it grows as the test month advances. The correspondence with models M1–M14 is given in the table of the next section: the same window is repeated with different sets of past-resistance features.
+In panel (a) the four-year training window ends just before the test month. In panels (b) and (c) the same four-year window is moved back by two and four years. In panel (d) training contains every culture from the start of the cohort up to the test month, and it grows as the test month advances. Models **M1–M14**, listed in the table further below, repeat these windows with different sets of past-resistance features.
 
 Two further restrictions keep the experiment close to clinical use. A patient who has a culture in the test month is removed from training, so the classifier is not evaluated on a patient already seen. When the training window ends immediately before the test window, cultures from the final 48 hours are excluded as well, because the antibiogram result of those cultures is not yet available.
 
@@ -59,25 +57,25 @@ The figure originally published with the paper is kept in [`assets/figures/paper
 
 ## Features derived from past antibiograms
 
-Each culture is described by demographic variables, by variables of the ICU admission, and by variables of the culture itself, including its date. In addition, the study proposes two groups of features that summarize antibiograms already reported before the culture being predicted.
+Each culture is described by **demographic** variables, variables of the **ICU admission**, and variables of the **culture** itself, including its date. The study also proposes two groups of features that summarize antibiograms already reported before the culture being predicted.
 
-Both groups use cultures of *Pseudomonas aeruginosa* collected between 21 days and 48 hours before the current culture. The 48-hour limit is the time required for an antibiogram result to become available. The 21-day limit is the period during which, from a clinical standpoint, a resistant result is still treated as current.
+Both groups use cultures of *Pseudomonas aeruginosa* collected between **21 days** and **48 hours** before the current culture. The 48-hour limit is the time required for an antibiogram result to become available. The 21-day limit is the period during which a resistant result is still treated as current.
 
-A past culture that was resistant contributes a weight that decreases as the number of elapsed days increases. A past culture that was susceptible contributes zero. With the decay parameter fixed at $\lambda = 0.095$, a resistant culture $c_k$ collected on day $d_k$ contributes the following amount to the culture $c$ collected on day $d$:
+A past **resistant** culture contributes a weight that decreases with the number of elapsed days. A past **susceptible** culture contributes zero. With $\lambda = 0.095$, a resistant culture $c_k$ collected on day $d_k$ contributes the following amount to the culture $c$ collected on day $d$:
 
 $$e^{-\lambda (d - d_k)}.$$
 
-The first group describes the patient under study. For antibiotic family $a_i$, the feature is the largest contribution among the past cultures of that same patient. In the paper this feature is written `p&a_i`:
+The first group, written **`p&a_i`** in the paper, describes the **patient under study**. For antibiotic family $a_i$ it is the largest contribution among that patient's past cultures:
 
 $$p_{a_i} = \max_k \mathrm{NEF}(c_k, c).$$
 
-The second group describes the other patients who were in the intensive care unit. For each of those patients the largest contribution is taken, and the values are then added. In the paper this feature is written `r&a_i`:
+The second group, written **`r&a_i`**, describes the **other patients in the ICU**. For each of them the largest contribution is taken, and those values are added:
 
 $$r_{a_i} = \sum_{j \neq p} \max_k \mathrm{NEF}(c_{j,k}, c).$$
 
-Six features of each group are computed, one per antibiotic family. If the time window contains no test of that family, the feature is left missing and is later replaced by zero. The interpretation used in the study is that the absence of a test is an absence of evidence that a bacterium resistant to that family was present.
+Six features of each group are computed, one per family. If the window contains no test of that family, the value is set to **zero**: the absence of a test was read as an absence of evidence that a resistant bacterium was present.
 
-The relevance of these variables depends on how it is measured. Mutual information is computed for each variable separately. It assigns the highest score to the date of the culture for every family, and it also assigns high scores to the ICU-wide features `r&a_i`. Random-forest importance is computed from an ensemble that uses all of the variables at once. Under that measure, the patient's own recent result for the family being predicted, `p&a_i`, is the highest-ranked variable for five of the six families. The date of the culture remains informative, but it mainly reflects the increase in the proportion of resistant cultures. Used as a predictor, it biases the classifier toward the class that predominates in the years being predicted, and the accuracy on susceptible cultures falls. Polymyxins are the exception: few cultures are resistant, and the culture date remains the most important variable.
+**Mutual information**, computed for each variable separately, assigns the highest score to the **date of the culture** and also ranks the ICU-wide features `r&a_i` highly. **Random-forest importance**, computed with all variables used jointly, ranks the patient's own recent result `p&a_i` first for five of the six families. The culture date remains informative, but it mainly reflects the rise in resistance over time. Used as a predictor, it biases the classifier toward the class that predominates in the years being predicted, and the accuracy on susceptible cultures falls. For **polymyxins**, where resistant cultures are few, the culture date remains the most important variable.
 
 <p align="center">
   <img src="assets/figures/mutual_information.png" alt="The five variables with the highest mutual information for each antibiotic family. The culture date is the largest marker in every column." width="720">
