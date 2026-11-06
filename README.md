@@ -4,13 +4,17 @@
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-2E7D4F)](LICENSE)
 
-Predict whether *Pseudomonas aeruginosa* cultured in an intensive care unit will be resistant to an antibiotic **before the antibiogram comes back**. The antibiogram takes about 48 hours. This repository is the code companion to the study, cleaned down to the experiment that was published.
+Antimicrobial resistance arises when a microorganism no longer responds to a drug that previously inhibited it. In an intensive care unit the consequences are immediate: patients are already critically ill, and the usual laboratory test, the antibiogram, takes about 48 hours to report whether the isolated bacterium is resistant or susceptible. During that interval the antibiotic treatment has to be chosen without the laboratory result.
 
-> Hernández-Carnerero, À., Sànchez-Marrè, M., Mora-Jiménez, I., Soguero-Ruiz, C., Martínez-Agüero, S., & Álvarez-Rodríguez, J. (2021). *Antimicrobial Resistance Prediction in Intensive Care Unit for Pseudomonas aeruginosa using Temporal Data-Driven Models.* International Journal of Interactive Multimedia and Artificial Intelligence. [https://doi.org/10.9781/ijimai.2021.02.012](https://doi.org/10.9781/ijimai.2021.02.012)
+The objective of this work is to predict, for a culture of *Pseudomonas aeruginosa*, whether the bacterium will be resistant or susceptible to a given antibiotic family, using only information that is already available before the antibiogram result. *Pseudomonas aeruginosa* was selected because it is frequent in the ICU, it causes severe infection, and it readily develops resistance to several drugs.
 
-The cohort is the ICU of Hospital Universitario de Fuenlabrada: 3,346 patients, 3,812 admissions, July 2004 to May 2019. Of 43,658 cultures, 764 grew *Pseudomonas aeruginosa*. Each of six antibiotic families is its own classifier.
+To do that, the study uses electronic health records (EHR) that the hospital already stores, together with the results of earlier antibiograms. The approach does not require whole-genome sequencing. The same records can therefore be used in other ICUs that collect cultures, admission data and susceptibility results.
 
-| | Family |
+The cohort of EHR data comes from the ICU of Hospital Universitario de Fuenlabrada (Madrid, Spain). It covers 3,346 patients and 3,812 admissions, from July 2004 to May 2019. Over that period 43,658 cultures were collected, from which this study retains the 764 cultures in which *Pseudomonas aeruginosa* was isolated. Some patients have more than one admission, which is why the number of admissions is larger than the number of patients.
+
+Resistance is predicted separately for each antibiotic family. Six binary classifiers are trained, one per family, because a culture may be resistant to one family and susceptible to another, and because each classifier can then be examined on its own. The families considered in the study are the following.
+
+| Code | Antibiotic family |
 | --- | --- |
 | AMG | Aminoglycosides |
 | CAR | Carbapenems |
@@ -19,89 +23,127 @@ The cohort is the ICU of Hospital Universitario de Fuenlabrada: 3,346 patients, 
 | POL | Polymyxins |
 | QUI | Quinolones |
 
-<p align="center">
-  <img src="assets/figures/windows.gif" alt="A four-year training window and a growing training window both move toward 2019, always leaving the next month for testing." width="820">
-</p>
+The prediction is repeated month by month. Two constructions of the training set are compared. In a **sliding window**, training uses a fixed period of four years placed before the month being predicted. In an **incremental window**, training starts at the beginning of the cohort and grows by one month at every step, always stopping before the month being predicted. The animation below shows these two constructions. The orange mark is the test month.
 
-## Why the calendar matters
-
-Resistance is not a fixed label. Across these 15 years the share of resistant *Pseudomonas* cultures rises, then breaks in 2013 when the ICU record system was replaced. A model trained on the early, mostly susceptible years will keep calling later cultures susceptible.
+**Training and test windows considered in the study: sliding and incremental**
 
 <p align="center">
-  <img src="assets/figures/resistance_over_time.png" alt="Percentage of resistant Pseudomonas cultures per antibiotic family from 2004 to 2019." width="640">
+  <img src="assets/figures/windows.gif" alt="A four-year sliding training window and a growing incremental training window both advance toward 2019. The following month is left for testing." width="820">
 </p>
 
-Training therefore never sees the future. The test is always the next month, from January 2016 onward. Two ways of choosing the past are compared.
+This repository contains the code that corresponds to the published experiment.
+
+> Hernández-Carnerero, À., Sànchez-Marrè, M., Mora-Jiménez, I., Soguero-Ruiz, C., Martínez-Agüero, S., & Álvarez-Rodríguez, J. (2021). *Antimicrobial Resistance Prediction in Intensive Care Unit for Pseudomonas aeruginosa using Temporal Data-Driven Models.* International Journal of Interactive Multimedia and Artificial Intelligence. [https://doi.org/10.9781/ijimai.2021.02.012](https://doi.org/10.9781/ijimai.2021.02.012)
+
+## Change of resistance over time
+
+The proportion of resistant cultures changes over the 15 years of the cohort. In the earlier years, susceptible results are the majority for most families. In the later years, resistant results become more frequent. The series also falls in 2013, when the ICU information system was replaced and fewer antibiograms were recorded. Polymyxins remain an exception: resistant results stay uncommon. Carbapenems move in the opposite direction and are resistant in nearly every culture by the end of the period.
 
 <p align="center">
-  <img src="assets/figures/windows.png" alt="Four training geometries: a four-year window next to the test, two years back, four years back, and a window that grows from 2004." width="820">
+  <img src="assets/figures/resistance_over_time.png" alt="Percentage of resistant Pseudomonas aeruginosa cultures per antibiotic family, from 2004 to 2019." width="640">
 </p>
 
-A patient who appears in the test month is removed from training. When training sits against the test month, the last 48 hours are left out as well: that antibiogram is not back yet.
+A classifier trained on the early years therefore learns a period in which susceptibility predominates. Applied unchanged to the later years, it continues to predict susceptibility and misses a large part of the resistant cultures. The chronological order of the cultures has to be preserved for a second, practical reason. When the model is used on a new culture, antibiograms that have not yet been collected do not exist. A training set that contained those future cultures would use information unavailable at prediction time. For that reason, cultures are sorted by the date of the culture, and a culture is predicted only from cultures collected before it.
 
-The original sketch from the paper is kept in [`assets/figures/paper_windows.png`](assets/figures/paper_windows.png). Read it for the geometry. Models M1–M14 also change which past-resistance features are used, which the sketch does not spell out. The mapping is below.
-
-## What the model is allowed to remember
-
-Demographic, admission and culture fields describe the current sample. Two constructed fields describe the recent past. Both look at *Pseudomonas* cultures between 21 days and 48 hours before the culture being predicted. A resistant culture contributes \(e^{-\lambda \Delta t}\) with \(\lambda = 0.095\). A susceptible culture contributes nothing.
-
-$$
-p\&a_i = \max_k \mathrm{NEF}(c_k, c)
-\qquad
-r\&a_i = \sum_{j \neq p} \max_k \mathrm{NEF}(c_{j,k}, c)
-$$
-
-`p&` is the patient's own strongest recent resistance. `r&` adds that quantity across the other patients who were in the unit. If the window contains no test for that family, the value is set to 0: in this study a missing test was read as no evidence of resistance.
-
-Mutual information ranks the culture date first, and the ICU-wide features look important. A random forest, which sees the columns together, tells a different story. The patient's own recent result is the feature that actually moves the prediction. The culture date mostly leaks the fact that later years are more resistant, and it hurts the susceptible class.
+The test set is always one calendar month. The first test month is January 2016, and the window then advances one month at a time, without overlap, until the end of the cohort. The training set that precedes each test month is built in one of the two ways shown above. The sliding window is also placed at three distances from the test month, so that the effect of predicting from an older period can be measured.
 
 <p align="center">
-  <img src="assets/figures/mutual_information.png" alt="Top mutual-information features. The culture date is largest for every family." width="720">
-  <br>
-  <img src="assets/figures/random_forest_importance.png" alt="Top random-forest features. The patient's own past result leads for five of the six families." width="720">
+  <img src="assets/figures/windows.png" alt="Four training schemes for a test month in 2016: a four-year window immediately before the test, the same window two years earlier, the same window four years earlier, and an incremental window from 2004." width="820">
 </p>
+
+In panel (a) the four-year training window ends just before the test month. In panels (b) and (c) the same four-year window is moved back by two and four years. In panel (d) training contains every culture from the start of the cohort up to the test month, and it grows as the test month advances. The correspondence with models M1–M14 is given in the table of the next section: the same window is repeated with different sets of past-resistance features.
+
+Two further restrictions keep the experiment close to clinical use. A patient who has a culture in the test month is removed from training, so the classifier is not evaluated on a patient already seen. When the training window ends immediately before the test window, cultures from the final 48 hours are excluded as well, because the antibiogram result of those cultures is not yet available.
+
+The figure originally published with the paper is kept in [`assets/figures/paper_windows.png`](assets/figures/paper_windows.png). It shows the same placement of the training and test intervals.
+
+## Features derived from past antibiograms
+
+Each culture is described by demographic variables, by variables of the ICU admission, and by variables of the culture itself, including its date. In addition, the study proposes two groups of features that summarize antibiograms already reported before the culture being predicted.
+
+Both groups use cultures of *Pseudomonas aeruginosa* collected between 21 days and 48 hours before the current culture. The 48-hour limit is the time required for an antibiogram result to become available. The 21-day limit is the period during which, from a clinical standpoint, a resistant result is still treated as current.
+
+A past culture that was resistant contributes a weight that decreases as the number of elapsed days increases. A past culture that was susceptible contributes zero. With the decay parameter fixed at $\lambda = 0.095$, a resistant culture $c_k$ collected on day $d_k$ contributes the following amount to the culture $c$ collected on day $d$:
+
+$$e^{-\lambda (d - d_k)}.$$
+
+The first group describes the patient under study. For antibiotic family $a_i$, the feature is the largest contribution among the past cultures of that same patient. In the paper this feature is written `p&a_i`:
+
+$$p_{a_i} = \max_k \mathrm{NEF}(c_k, c).$$
+
+The second group describes the other patients who were in the intensive care unit. For each of those patients the largest contribution is taken, and the values are then added. In the paper this feature is written `r&a_i`:
+
+$$r_{a_i} = \sum_{j \neq p} \max_k \mathrm{NEF}(c_{j,k}, c).$$
+
+Six features of each group are computed, one per antibiotic family. If the time window contains no test of that family, the feature is left missing and is later replaced by zero. The interpretation used in the study is that the absence of a test is an absence of evidence that a bacterium resistant to that family was present.
+
+The relevance of these variables depends on how it is measured. Mutual information is computed for each variable separately. It assigns the highest score to the date of the culture for every family, and it also assigns high scores to the ICU-wide features `r&a_i`. Random-forest importance is computed from an ensemble that uses all of the variables at once. Under that measure, the patient's own recent result for the family being predicted, `p&a_i`, is the highest-ranked variable for five of the six families. The date of the culture remains informative, but it mainly reflects the increase in the proportion of resistant cultures. Used as a predictor, it biases the classifier toward the class that predominates in the years being predicted, and the accuracy on susceptible cultures falls. Polymyxins are the exception: few cultures are resistant, and the culture date remains the most important variable.
+
+<p align="center">
+  <img src="assets/figures/mutual_information.png" alt="The five variables with the highest mutual information for each antibiotic family. The culture date is the largest marker in every column." width="720">
+</p>
+
+Mutual information, computed one variable at a time. The area of each marker is the score.
+
+<p align="center">
+  <img src="assets/figures/random_forest_importance.png" alt="The five variables with the highest random-forest importance for each antibiotic family. The patient's own past result leads for five families." width="720">
+</p>
+
+Random-forest importance, computed with all variables used jointly. The patient's own past result leads for every family except polymyxins.
 
 ## The fourteen models
 
-Logistic regression is the baseline. Random forest is the second classifier. Classes are not rebalanced. Oversampling was left as later work, because the class ratio is part of the drift.
+Logistic regression is the baseline classifier. Random forest is the second classifier. Before logistic regression, the predictors are standardized with the mean and variance of the training window. The class distribution is left as it is observed: the published experiments do not oversample the minority class, because the change in that proportion is part of the phenomenon under study.
 
-| Models | Training window | Past cultures used |
+| Models | Training window | Past-resistance features |
 | --- | --- | --- |
-| M1, M2, M3 | 4 years, placed 0 / 2 / 4 years before the test | neither |
-| M4, M5, M6 | 4 years, placed 0 / 2 / 4 years before the test | ICU patients only (`r&`) |
-| M7, M8, M9 | 4 years, placed 0 / 2 / 4 years before the test | own patient and ICU (`p&` and `r&`) |
-| M10, M11, M12 | Incremental, from the first culture | neither / ICU only / both |
-| M13, M14 | Incremental, with a time decay on each training row | ICU only / both |
+| M1, M2, M3 | Sliding, 4 years, placed 0, 2 and 4 years before the test | none |
+| M4, M5, M6 | Sliding, 4 years, placed 0, 2 and 4 years before the test | ICU patients only (`r&`) |
+| M7, M8, M9 | Sliding, 4 years, placed 0, 2 and 4 years before the test | the patient and the ICU (`p&` and `r&`) |
+| M10, M11, M12 | Incremental, from the first culture | none, ICU only, or both |
+| M13, M14 | Incremental, with a weight on each training culture | ICU only, or both |
 
-Each model is run with and without `date_culture`. For M13 and M14 the decay is chosen from \(0, 10^{-5}, 10^{-4}, 10^{-3}, 10^{-2}, 0.1, 1\). A decay of 0 gives every row the same weight.
+Every model is trained twice, once with the culture date and once without it.
 
-Accuracy is accumulated across months, not averaged. A month with two cultures must not count as much as a month with twenty. Three numbers are reported: total, resistant, and susceptible.
+For M13 and M14 the training cultures do not all contribute equally. A culture close to the test month receives a larger weight than a culture from the early years. If $d_l$ is the date of the last culture in the training window and $d_c$ is the date of the culture being weighted, its weight is
+
+$$w(c) = e^{-\lambda (d_l - d_c)}.$$
+
+This $\lambda$ is a second parameter. It is distinct from the value $0.095$ used to build `p&` and `r&`. It is chosen, for each experiment, from
+
+$$\{0,\ 10^{-5},\ 10^{-4},\ 10^{-3},\ 10^{-2},\ 0.1,\ 1\}$$
+
+as the value that obtains the best figures of merit. When $\lambda = 0$, the exponent is zero for every culture, so every training culture receives the same weight, $w(c) = 1$. When $\lambda$ is large, only cultures collected shortly before the test month keep a weight close to 1, and the older cultures are almost ignored. The selected values are listed in [`results/published_lambda.csv`](results/published_lambda.csv).
+
+Performance is summarized by three figures of merit. They are computed from counts accumulated over all test months, rather than by averaging the accuracy of each month. A month that contains many cultures then contributes more than a month that contains few. Let $N_s$ and $N_r$ be the number of susceptible and resistant cultures in the accumulated test set, and let $S_s$ and $S_r$ be the number of those cultures that are correctly classified. Total, resistant and susceptible accuracy are
+
+$$A_{\mathrm{Tot}} = \frac{S_s + S_r}{N_s + N_r}, \qquad A_{\mathrm{Rst}} = \frac{S_r}{N_r}, \qquad A_{\mathrm{Scb}} = \frac{S_s}{N_s}.$$
 
 ## Published results
 
-These are the best weighted incremental models in the paper, as total / resistant / susceptible accuracy. The full grid is in [`results/published_accuracy.csv`](results/published_accuracy.csv). The decay chosen for each run is in [`results/published_lambda.csv`](results/published_lambda.csv).
+The table below reports the best result obtained with the weighted incremental window for each family, in the order total / resistant / susceptible accuracy. The complete grid is in [`results/published_accuracy.csv`](results/published_accuracy.csv).
 
-| Family | Model | Classifier | Culture date | Accuracy |
+| Family | Model | Classifier | Culture date | Total / resistant / susceptible accuracy |
 | --- | --- | --- | --- | --- |
-| AMG | M14 | Random forest | no | **79.55 / 75.76 / 90.91** |
-| CAR | M13 | Logistic regression | yes or no | **94.32 / 100 / 16.67** |
-| CF4 | M14 | Random forest | no | **60.67 / 58.62 / 64.52** |
-| PAP | M14 | Logistic regression | no | **71.91 / 69.81 / 75.00** |
-| POL | M13 | Logistic regression | yes | **72.41 / 60.00 / 78.95** |
-| QUI | M14 | Random forest | no | **83.02 / 83.33 / 80.00** |
+| AMG | M14 | Random forest | excluded | **79.55 / 75.76 / 90.91** |
+| CAR | M13 | Logistic regression | either | **94.32 / 100 / 16.67** |
+| CF4 | M14 | Random forest | excluded | **60.67 / 58.62 / 64.52** |
+| PAP | M14 | Logistic regression | excluded | **71.91 / 69.81 / 75.00** |
+| POL | M13 | Logistic regression | included | **72.41 / 60.00 / 78.95** |
+| QUI | M14 | Random forest | excluded | **83.02 / 83.33 / 80.00** |
 
-CAR looks solved because, by the test years, almost every culture is resistant. The susceptible accuracy gives that away. POL is the other extreme, with very few resistant cultures, and its best result in the paper is not the weighted window: a 4-year window sitting next to the test month, logistic regression, no culture date and neither past feature, reaches 74.71 / 63.33 / 80.70.
+The total accuracy for carbapenems is high because, in the test years, almost every culture of that family is resistant. The susceptible accuracy shows the cost of that imbalance. Polymyxins have very few resistant cultures. For that family, the best result in the paper is a sliding window placed immediately before the test month, with logistic regression, without the culture date and without the past-resistance features: 74.71 / 63.33 / 80.70.
 
-Using only the patient's own past result (`p&`) is already strong for several families. Using only the culture date pushes logistic regression onto the majority class. Both tables are in [`results/published_single_feature.csv`](results/published_single_feature.csv).
+A further experiment predicts each family from a single variable. The patient's own past result, `p&a_i`, is already sufficient for a relatively high accuracy in several families. The culture date on its own concentrates the logistic-regression predictions on the majority class of the test period. Both experiments are reported in [`results/published_single_feature.csv`](results/published_single_feature.csv).
 
-## Run it
+## Running the code
 
 ```bash
 pip install -e ".[dev]"
 python -m amr_icu --synthetic
 ```
 
-The default command trains logistic regression and a random forest for three of the published models on the invented cohort. It takes a few minutes. The printed accuracies are a smoke test. They are not the table above.
+The default command trains logistic regression and a random forest for models M7, M12 and M14 on an invented cohort, for the aminoglycoside family. It takes a few minutes. The printed accuracies only confirm that the pipeline runs. They are not comparable to the published table.
 
 ```bash
 python -m amr_icu --synthetic --family all --models all --date-culture both
@@ -110,24 +152,24 @@ python -m amr_icu --synthetic --importance
 pytest
 ```
 
-A real cohort uses the columns in [`data/README.md`](data/README.md). One row is one culture. Resistance cells are `r`, `s`, or empty when that family was not tested. The package derives the calendar fields and the past-resistance features.
+A cohort file uses the columns described in [`data/README.md`](data/README.md). Each row is one culture. A resistance cell contains `r`, `s`, or is left empty when that family was not tested. The package derives the calendar variables and the past-resistance features.
 
 ```text
 src/amr_icu/
-  features.py      p& and r&, the negative exponential
-  preprocess.py    48-hour stays, integer codes, correlated dates removed
-  windows.py       monthly test, sliding and incremental training, patient split
-  models.py        logistic regression (standardized) and random forest
-  metrics.py       accuracies accumulated across months
-  experiment.py    M1–M14 and the decay search
-  synthetic.py     invented cohort
+  features.py      p& and r&, from the negative exponential
+  preprocess.py    stays of at least 48 hours, integer codes, correlated dates removed
+  windows.py       monthly test, sliding and incremental training, patient exclusion
+  models.py        logistic regression, with standardization, and random forest
+  metrics.py       total, resistant and susceptible accuracy, accumulated over months
+  experiment.py    models M1–M14 and the search over the weight decay
+  synthetic.py     invented cohort used to run the code
 ```
 
-The original experiment lived in a set of notebooks, copied once per antibiotic family, with SMOTE and an LSTM tried along the way. Those runs are not part of the published comparison, so they are not in this package. This code follows the paper's definitions: a 48-hour margin, \(\lambda = 0.095\), and calendar windows from January 2016. It will not reproduce the notebooks bitwise. The notebooks stepped by month index from the first culture and, in some revisions, called an oversampler the paper does not use.
+The experiments were originally run from a collection of notebooks, duplicated for each antibiotic family. Some of those notebooks also tried SMOTE and a long short-term memory network. Those trials are outside the published comparison, and they are not included here. The implementation follows the definitions in the paper: a margin of 48 hours, a feature decay of $\lambda = 0.095$, and test months from January 2016. It does not reproduce the notebooks line by line. The notebooks advanced by a month index counted from the first culture and, in some revisions, applied an oversampling step that the paper does not use.
 
 ## Data
 
-No file from the hospital is in this repository. The extract is anonymized, and it still contains dates, age, sex, origin and reason for admission. That is enough to re-identify a stay, and the hospital asked for it to remain private. [`data/synthetic/cohort.csv`](data/synthetic/cohort.csv) has the same columns and none of the patients. Metrics from it must not be compared with the paper.
+The hospital extract is not part of this repository. The file is anonymized, but it still contains dates, age, sex, the department of origin and the reason for admission. Combined, those fields can re-identify a stay, and the hospital requested that the data remain private. The file [`data/synthetic/cohort.csv`](data/synthetic/cohort.csv) has the same columns and contains no patient from the study. Accuracies computed from it cannot be compared with the published results.
 
 ## Citation
 
@@ -141,4 +183,4 @@ No file from the hospital is in this repository. The extract is anonymized, and 
 }
 ```
 
-A machine-readable citation is in [`CITATION.cff`](CITATION.cff). Figures from the study are reproduced in `assets/figures/` and belong with the paper.
+A machine-readable citation is in [`CITATION.cff`](CITATION.cff). The figures taken from the study are in `assets/figures/` and are reproduced with the paper.
