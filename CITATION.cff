@@ -1,0 +1,55 @@
+cff-version: 1.2.0
+title: >-
+  Antimicrobial resistance prediction in the ICU for Pseudomonas aeruginosa
+  using temporal data-driven models
+message: If you use this software, please cite the paper below.
+type: software
+authors:
+  - family-names: Hernández-Carnerero
+    given-names: Àlvar
+    affiliation: Universitat Politècnica de Catalunya
+    email: alvar.hernandez@upc.edu
+  - family-names: Sànchez-Marrè
+    given-names: Miquel
+    affiliation: Universitat Politècnica de Catalunya
+  - family-names: Mora-Jiménez
+    given-names: Inmaculada
+    affiliation: Universidad Rey Juan Carlos
+  - family-names: Soguero-Ruiz
+    given-names: Cristina
+    affiliation: Universidad Rey Juan Carlos
+  - family-names: Martínez-Agüero
+    given-names: Sergio
+    affiliation: Universidad Rey Juan Carlos
+  - family-names: Álvarez-Rodríguez
+    given-names: Joaquín
+    affiliation: Hospital Universitario de Fuenlabrada
+license: MIT
+keywords:
+  - antimicrobial resistance
+  - intensive care
+  - Pseudomonas aeruginosa
+  - concept drift
+  - electronic health records
+preferred-citation:
+  type: article
+  title: >-
+    Antimicrobial Resistance Prediction in Intensive Care Unit for Pseudomonas
+    aeruginosa using Temporal Data-Driven Models
+  authors:
+    - family-names: Hernández-Carnerero
+      given-names: Àlvar
+    - family-names: Sànchez-Marrè
+      given-names: Miquel
+    - family-names: Mora-Jiménez
+      given-names: Inmaculada
+    - family-names: Soguero-Ruiz
+      given-names: Cristina
+    - family-names: Martínez-Agüero
+      given-names: Sergio
+    - family-names: Álvarez-Rodríguez
+      given-names: Joaquín
+  journal: International Journal of Interactive Multimedia and Artificial Intelligence
+  year: 2021
+  doi: 10.9781/ijimai.2021.02.012
+  url: https://doi.org/10.9781/ijimai.2021.02.012
