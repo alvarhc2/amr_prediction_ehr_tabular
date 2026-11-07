@@ -3,7 +3,7 @@
 import numpy as np
 import pandas as pd
 
-from amr_icu.config import TRAIN_YEARS, WEIGHT_LAMBDAS, ModelSpec, get_specs
+from amr_icu.config import WEIGHT_LAMBDAS, ModelSpec, get_specs
 from amr_icu.metrics import Counts
 from amr_icu.models import fit_predict
 from amr_icu.schema import META_COLUMNS
@@ -36,33 +36,19 @@ def run_experiment(
             target = frame["target"].to_numpy(dtype=int)
             for method in methods:
                 if verbose:
-                    print(_model_banner(family, spec, method, date_flag), flush=True)
+                    date = "on" if date_flag else "off"
+                    print(f"  {spec.name} {method}  {spec.window}  date {date}", flush=True)
                 if spec.weighted:
-                    if verbose:
-                        grid = ", ".join(format_lambda(lam) for lam in weight_grid)
-                        print(
-                            "    Trying every weight decay on the full sequence of test months: "
-                            f"{grid}. The decay with the highest mean of the three accuracies is kept. "
-                            "A tie keeps the smaller decay.",
-                            flush=True,
-                        )
                     chosen_lam, counts = _best_weight(
                         frame, matrix, target, windows, method, weight_grid, verbose=verbose
                     )
                 else:
-                    if verbose:
-                        print(
-                            "    Fitting one classifier per test month and accumulating the counts. "
-                            "This model has no weight decay.",
-                            flush=True,
-                        )
                     chosen_lam = float("nan")
-                    counts = _accumulate(frame, matrix, target, windows, method, lam=None)
+                    counts = _accumulate(
+                        frame, matrix, target, windows, method, lam=None, verbose=verbose
+                    )
                     if verbose:
-                        print(
-                            f"    Done. {counts.steps} test months contributed to the accuracies.",
-                            flush=True,
-                        )
+                        print(f"    {counts.steps} months", flush=True)
                 rows.append(_row(family, spec, date_flag, method, chosen_lam, counts))
     return pd.DataFrame(rows)
 
@@ -87,10 +73,12 @@ def _best_weight(
     best_lam = weight_grid[0]
     best_counts = None
     best_score = -1.0
-    for lam in weight_grid:
+    for index, lam in enumerate(weight_grid):
         if verbose:
-            print(f"    lambda = {format_lambda(lam)}", flush=True)
-        counts = _accumulate(frame, matrix, target, windows, method, lam=lam)
+            print(f"    lambda {format_lambda(lam)}", flush=True)
+        counts = _accumulate(
+            frame, matrix, target, windows, method, lam=lam, verbose=verbose and index == 0
+        )
         score = counts.selection_score()
         if best_counts is None or score > best_score + 1e-12:
             best_lam = lam
@@ -99,11 +87,7 @@ def _best_weight(
     if best_counts is None:
         raise ValueError("The weight grid is empty.")
     if verbose:
-        print(
-            f"    Selected lambda = {format_lambda(best_lam)}. "
-            f"{best_counts.steps} test months contributed to the accuracies.",
-            flush=True,
-        )
+        print(f"    selected {format_lambda(best_lam)}, {best_counts.steps} months", flush=True)
     return best_lam, best_counts
 
 
@@ -116,40 +100,22 @@ def format_lambda(lam: float) -> str:
     return f"{lam:.0e}"
 
 
-def _model_banner(family: str, spec: ModelSpec, method: str, use_date: bool) -> str:
-    method_name = "logistic regression" if method == "lr" else "random forest"
-    if spec.mode == "sliding":
-        window = (
-            f"sliding window of {TRAIN_YEARS} years, "
-            f"placed {spec.gap_years} years before the test month"
-        )
-    elif spec.weighted:
-        window = "incremental window with a weight on each training culture"
-    else:
-        window = "incremental window, from the first culture up to the test month"
-    if spec.use_p and spec.use_r:
-        past = "p& and r&"
-    elif spec.use_r:
-        past = "r& only"
-    elif spec.use_p:
-        past = "p& only"
-    else:
-        past = "none"
-    date = "included" if use_date else "excluded"
-    return (
-        f"  {family.upper()} {spec.name}, {method_name} ({method}). "
-        f"{window}. Culture date {date}. Past-resistance features: {past}."
-    )
-
-
-def _accumulate(frame, matrix, target, windows, method, lam: float | None) -> Counts:
+def _accumulate(frame, matrix, target, windows, method, lam: float | None, verbose: bool = False) -> Counts:
     counts = Counts()
+    shown = 0
     for window in windows:
         if len(window.train_index) == 0 or len(window.test_index) == 0:
             continue
         y_train = target[window.train_index]
         if len(np.unique(y_train)) < 2:
             continue
+        if verbose:
+            if shown % 6 == 0:
+                print("   ", end="", flush=True)
+            print(f" {window.test_start:%Y-%m}", end="", flush=True)
+            shown += 1
+            if shown % 6 == 0:
+                print(flush=True)
         weights = None
         if lam is not None:
             weights = instance_weights(frame["culture_date"], window, lam)
@@ -161,6 +127,8 @@ def _accumulate(frame, matrix, target, windows, method, lam: float | None) -> Co
             sample_weight=weights,
         )
         counts.add(target[window.test_index], prediction)
+    if verbose and shown % 6:
+        print(flush=True)
     return counts
 
 
