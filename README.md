@@ -41,9 +41,11 @@ The proportion of resistant cultures changes over the 15 years of the cohort. In
   <img src="assets/figures/resistance_over_time.png" alt="Percentage of resistant Pseudomonas aeruginosa cultures per antibiotic family, from 2004 to 2019." width="640">
 </p>
 
-A classifier trained on the early years therefore learns a period in which susceptibility predominates. Applied unchanged to the later years, it continues to predict susceptibility and misses a large part of the resistant cultures. The chronological order of the cultures has to be preserved for a second, practical reason. When the model is used on a new culture, antibiograms that have not yet been collected do not exist. A training set that contained those future cultures would use information unavailable at prediction time. For that reason, cultures are sorted by the date of the culture, and a culture is predicted only from cultures collected before it.
+A classifier trained on the early years therefore learns a period in which **susceptibility** predominates. Applied to the later years, it continues to predict susceptibility and misses a large part of the **resistant** cultures. The order of the cultures is also fixed by what is known at prediction time: only antibiograms **already collected** can be used. Cultures are sorted by **date**, and each culture is predicted only from those that precede it.
 
-The test set is always one calendar month. The first test month is January 2016, and the window then advances one month at a time, without overlap, until the end of the cohort. The training set that precedes each test month is built in one of the two ways shown above. The sliding window is also placed at three distances from the test month, so that the effect of predicting from an older period can be measured.
+The **test set** is one calendar month. The first test month is **January 2016**, and the window then advances one month at a time, without overlap, until the end of the cohort. The training set that precedes each test month is built in one of the 
+two ways shown above. The **sliding window** is also placed at three distances from the test month, so that the effect of 
+predicting from an older period can be measured.
 
 <p align="center">
   <img src="assets/figures/windows.png" alt="Four training schemes for a test month in 2016: a four-year window immediately before the test, the same window two years earlier, the same window four years earlier, and an incremental window from 2004." width="820">
@@ -63,7 +65,7 @@ Both groups use cultures of *Pseudomonas aeruginosa* collected between **21 days
 
 A past **resistant** culture contributes a weight that decreases with the number of elapsed days. A past **susceptible** culture contributes zero. With $\lambda = 0.095$, a resistant culture $c_k$ collected on day $d_k$ contributes the following amount to the culture $c$ collected on day $d$:
 
-$$e^{-\lambda (d - d_k)}.$$
+$$\mathrm{NEF}(c_k, c) = e^{-\lambda (d - d_k)}.$$
 
 The first group, written **`p&a_i`** in the paper, describes the **patient under study**. For antibiotic family $a_i$ it is the largest contribution among that patient's past cultures:
 
@@ -78,16 +80,14 @@ Six features of each group are computed, one per family. If the window contains 
 **Mutual information**, computed for each variable separately, assigns the highest score to the **date of the culture** and also ranks the ICU-wide features `r&a_i` highly. **Random-forest importance**, computed with all variables used jointly, ranks the patient's own recent result `p&a_i` first for five of the six families. The culture date remains informative, but it mainly reflects the rise in resistance over time. Used as a predictor, it biases the classifier toward the class that predominates in the years being predicted, and the accuracy on susceptible cultures falls. For **polymyxins**, where resistant cultures are few, the culture date remains the most important variable.
 
 <p align="center">
-  <img src="assets/figures/mutual_information.png" alt="The five variables with the highest mutual information for each antibiotic family. The culture date is the largest marker in every column." width="720">
+  <img src="assets/figures/mutual_information.png" alt="The five variables with the highest mutual information for each antibiotic family. The culture date is the largest marker in every column." width="520"><br>
+  <sub>Mutual information, computed one variable at a time. The area of each marker is the score.</sub>
 </p>
-
-Mutual information, computed one variable at a time. The area of each marker is the score.
 
 <p align="center">
-  <img src="assets/figures/random_forest_importance.png" alt="The five variables with the highest random-forest importance for each antibiotic family. The patient's own past result leads for five families." width="720">
+  <img src="assets/figures/random_forest_importance.png" alt="The five variables with the highest random-forest importance for each antibiotic family. The patient's own past result leads for five families." width="520"><br>
+  <sub>Random-forest importance, computed with all variables used jointly. The patient's own past result leads for every family except polymyxins.</sub>
 </p>
-
-Random-forest importance, computed with all variables used jointly. The patient's own past result leads for every family except polymyxins.
 
 ## The fourteen models
 
@@ -119,20 +119,22 @@ $$A_{\mathrm{Tot}} = \frac{S_s + S_r}{N_s + N_r}, \qquad A_{\mathrm{Rst}} = \fra
 
 ## Published results
 
-The table below reports the best result obtained with the weighted incremental window for each family, in the order total / resistant / susceptible accuracy. The complete grid is in [`results/published_accuracy.csv`](results/published_accuracy.csv).
+The table below reports, for each family, the configuration whose lower class accuracy is the highest, in the order total / resistant / susceptible accuracy. The complete grid is in [`results/published_accuracy.csv`](results/published_accuracy.csv).
 
-| Family | Model | Classifier | Culture date | Total / resistant / susceptible accuracy |
-| --- | --- | --- | --- | --- |
-| AMG | M14 | Random forest | excluded | **79.55 / 75.76 / 90.91** |
-| CAR | M13 | Logistic regression | either | **94.32 / 100 / 16.67** |
-| CF4 | M14 | Random forest | excluded | **60.67 / 58.62 / 64.52** |
-| PAP | M14 | Logistic regression | excluded | **71.91 / 69.81 / 75.00** |
-| POL | M13 | Logistic regression | included | **72.41 / 60.00 / 78.95** |
-| QUI | M14 | Random forest | excluded | **83.02 / 83.33 / 80.00** |
+| Family | Model | Window | Classifier | Culture date | Total / resistant / susceptible accuracy |
+| --- | --- | --- | --- | --- | --- |
+| AMG | M14 | Weighted incremental | Random forest | excluded | **79.55 / 75.76 / 90.91** |
+| CAR | M12 | Incremental | Logistic regression | excluded | **75.00 / 74.39 / 83.33** |
+| CF4 | M14 | Weighted incremental | Random forest | excluded | **60.67 / 58.62 / 64.52** |
+| PAP | M14 | Weighted incremental | Logistic regression | excluded | **71.91 / 69.81 / 75.00** |
+| POL | M1 | Sliding, 0 years | Logistic regression | excluded | **74.71 / 63.33 / 80.70** |
+| QUI | M9 | Sliding, 4 years | Random forest | either | **83.02 / 81.25 / 100** |
 
-The total accuracy for carbapenems is high because, in the test years, almost every culture of that family is resistant. The susceptible accuracy shows the cost of that imbalance. Polymyxins have very few resistant cultures. For that family, the best result in the paper is a sliding window placed immediately before the test month, with logistic regression, without the culture date and without the past-resistance features: 74.71 / 63.33 / 80.70.
+Neither **logistic regression** nor **random forest** is ahead for every family. The best classifier changes with the family, and the scores vary substantially from one family to another.
 
-A further experiment predicts each family from a single variable. The patient's own past result, `p&a_i`, is already sufficient for a relatively high accuracy in several families. The culture date on its own concentrates the logistic-regression predictions on the majority class of the test period. Both experiments are reported in [`results/published_single_feature.csv`](results/published_single_feature.csv).
+One pattern holds across that variation. Accuracy falls when both the **culture date** and the patient's own past result **`p&a_i`** are left out: the classifier then follows the majority class of the training period, which often differs from the majority class of the test months. The culture date partly compensates, by biasing the prediction toward the class that predominates near the test month. Total accuracy rises, and accuracy on the minority class falls. The features `p&a_i` reach a high accuracy without that bias, and for several families `p&a_i` alone exceeds the configurations that use the culture date. A single-variable comparison of the two is in [`results/published_single_feature.csv`](results/published_single_feature.csv). Adding the ICU-wide features `r&a_i` on their own, without `p&a_i`, does not consistently improve on the same model trained without them.
+
+The **sliding window** is the most restrictive of the three: training uses only a small set of recent cultures. The gap and the feature set that perform best change from one family to another, and no single combination does so throughout. The **incremental window** is more stable. It trains on every culture from the start of the cohort, and that larger set reduces the variance of the fit. Its best results include `p&a_i`, and its accuracy is comparable to the best sliding window, and better for some families. The **weighted incremental window** combines the two. Through the decay $\lambda$ it can behave as either of them: a small value retains the older cultures, and a large value retains only the recent ones. It is already the scheme with the best result for the most families, three of the six. In the present cohort that advantage is only partly visible. With more training data, or by combining several values of $\lambda$, the weighted window should be able to match either of the other two and to surpass them where they disagree.
 
 ## Running the code
 
@@ -163,11 +165,9 @@ src/amr_icu/
   synthetic.py     invented cohort used to run the code
 ```
 
-The experiments were originally run from a collection of notebooks, duplicated for each antibiotic family. Some of those notebooks also tried SMOTE and a long short-term memory network. Those trials are outside the published comparison, and they are not included here. The implementation follows the definitions in the paper: a margin of 48 hours, a feature decay of $\lambda = 0.095$, and test months from January 2016. It does not reproduce the notebooks line by line. The notebooks advanced by a month index counted from the first culture and, in some revisions, applied an oversampling step that the paper does not use.
-
 ## Data
 
-The hospital extract is not part of this repository. The file is anonymized, but it still contains dates, age, sex, the department of origin and the reason for admission. Combined, those fields can re-identify a stay, and the hospital requested that the data remain private. The file [`data/synthetic/cohort.csv`](data/synthetic/cohort.csv) has the same columns and contains no patient from the study. Accuracies computed from it cannot be compared with the published results.
+The hospital extract is not part of this repository. Due to confidentiality, it cannot be uploaded. The file [`data/synthetic/cohort.csv`](data/synthetic/cohort.csv) has the same columns and contains no patient from the study. Accuracies computed from it cannot be compared with the published results.
 
 ## Citation
 
